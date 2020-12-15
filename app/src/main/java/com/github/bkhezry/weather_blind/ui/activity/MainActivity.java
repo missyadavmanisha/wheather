@@ -1,11 +1,21 @@
 package com.github.bkhezry.weather_blind.ui.activity;
 
+import android.annotation.SuppressLint;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.speech.RecognizerIntent;
+import android.speech.tts.TextToSpeech;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,6 +28,7 @@ import com.github.bkhezry.weather_blind.R;
 import com.github.bkhezry.weather_blind.databinding.ActivityMainBinding;
 import com.github.bkhezry.weather_blind.model.CityInfo;
 import com.github.bkhezry.weather_blind.model.currentweather.CurrentWeatherResponse;
+import com.github.bkhezry.weather_blind.model.currentweather.Main;
 import com.github.bkhezry.weather_blind.model.daysweather.ListItem;
 import com.github.bkhezry.weather_blind.model.daysweather.MultipleDaysWeatherResponse;
 import com.github.bkhezry.weather_blind.model.db.CurrentWeather;
@@ -42,6 +53,7 @@ import com.mikepenz.fastadapter.IAdapter;
 import com.mikepenz.fastadapter.adapters.ItemAdapter;
 import com.mikepenz.fastadapter.listeners.OnClickListener;
 
+import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -62,6 +74,7 @@ import retrofit2.HttpException;
 
 public class MainActivity extends BaseActivity {
 
+  private static final int REQ_CODE_SPEECH_INPUT = 102;
   private FastAdapter<FiveDayWeather> mFastAdapter;
   private ItemAdapter<FiveDayWeather> mItemAdapter;
   private CompositeDisposable disposable = new CompositeDisposable();
@@ -79,8 +92,12 @@ public class MainActivity extends BaseActivity {
   private String apiKey;
   private Typeface typeface;
   private ActivityMainBinding binding;
+  private TextView etCity;
   private int[] colors;
   private int[] colorsAlpha;
+  private TextToSpeech textToSpeech;
+  private ImageButton btnVoice;
+  private String cityNameinput;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -88,6 +105,8 @@ public class MainActivity extends BaseActivity {
     binding = ActivityMainBinding.inflate(getLayoutInflater());
     setContentView(binding.getRoot());
     setSupportActionBar(binding.toolbarLayout.toolbar);
+    etCity=findViewById(R.id.etCity);
+    btnVoice=findViewById(R.id.btnVoice);
     initSearchView();
     initValues();
     setupTextSwitchers();
@@ -95,32 +114,85 @@ public class MainActivity extends BaseActivity {
     showStoredCurrentWeather();
     showStoredFiveDayWeather();
     checkLastUpdate();
+
   }
 
   private void initSearchView() {
-    binding.toolbarLayout.searchView.setVoiceSearch(false);
-    binding.toolbarLayout.searchView.setHint(getString(R.string.search_label));
-    binding.toolbarLayout.searchView.setCursorDrawable(R.drawable.custom_curosr);
-    binding.toolbarLayout.searchView.setEllipsize(true);
-    binding.toolbarLayout.searchView.setOnQueryTextListener(new MaterialSearchView.OnQueryTextListener() {
-      @Override
-      public boolean onQueryTextSubmit(String query) {
-        requestWeather(query, true);
-        return false;
-      }
 
-      @Override
-      public boolean onQueryTextChange(String newText) {
-        return false;
-      }
-    });
-    binding.toolbarLayout.searchView.setOnClickListener(new View.OnClickListener() {
+
+    btnVoice.setOnClickListener(new View.OnClickListener() {
       @Override
       public void onClick(View v) {
-        binding.toolbarLayout.searchView.showSearch();
+        textToSpeech = new TextToSpeech(MainActivity.this, new TextToSpeech.OnInitListener() {
+
+          @Override
+          public void onInit(int arg0) {
+            if(arg0 == TextToSpeech.SUCCESS)
+            {
+              textToSpeech.setLanguage(Locale.US);
+              say("Which city's weather would you like to know?",true);
+            //  say(line,false);
+             // say(definition_string,false);
+            }
+          }
+        });
+        promptSpeechInput();
+        requestWeather(cityNameinput, true);
+    //    etCity.setText(cityNameinput);
       }
     });
 
+  }
+  void say(String text, boolean flush) {
+    if(flush == true)
+    {
+      textToSpeech.speak(text,TextToSpeech.QUEUE_FLUSH,null);
+    }
+    if(flush == false)
+    {
+      textToSpeech.speak(text,TextToSpeech.QUEUE_ADD,null);
+    }
+  }
+  @Override
+  protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    super.onActivityResult(requestCode, resultCode, data);
+
+    switch (requestCode) {
+      case REQ_CODE_SPEECH_INPUT: {
+        if (resultCode == RESULT_OK && null != data) {
+
+          ArrayList<String> result = data
+                  .getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+          assert result != null;
+          cityNameinput=result.get(0);
+        }
+        break;
+      }
+
+    }
+  }
+  private void promptSpeechInput() {
+    Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+    intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+    intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+    intent.putExtra(RecognizerIntent.EXTRA_PROMPT,
+            getString(R.string.speech_prompt));
+    try {
+      startActivityForResult(intent, REQ_CODE_SPEECH_INPUT);
+    } catch (ActivityNotFoundException a) {
+      Toast.makeText(getApplicationContext(),
+              getString(R.string.speech_not_supported),
+              Toast.LENGTH_SHORT).show();
+    }
+  }
+  @Override
+  protected void onPause() {
+    super.onPause();
+    if (textToSpeech != null) {
+      textToSpeech.stop();
+      textToSpeech.shutdown();
+    }
   }
 
   private void initValues() {
@@ -332,7 +404,7 @@ public class MainActivity extends BaseActivity {
           .setAction(getResources().getString(R.string.search_label), new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-              binding.toolbarLayout.searchView.showSearch();
+           //   binding.toolbarLayout.searchView.showSearch();
             }
           })
           .showWarning();
@@ -361,7 +433,7 @@ public class MainActivity extends BaseActivity {
               if (cityInfo != null) {
                 requestWeather(cityInfo.getName(), false);
               } else {
-                binding.toolbarLayout.searchView.showSearch();
+               // binding.toolbarLayout.searchView.showSearch();
               }
             }
           })
@@ -514,7 +586,7 @@ public class MainActivity extends BaseActivity {
   public boolean onCreateOptionsMenu(Menu menu) {
     getMenuInflater().inflate(R.menu.menu_main, menu);
     MenuItem item = menu.findItem(R.id.action_search);
-    binding.toolbarLayout.searchView.setMenuItem(item);
+    //binding.toolbarLayout.searchView.setMenuItem(item);
     return true;
   }
 
@@ -522,12 +594,12 @@ public class MainActivity extends BaseActivity {
     AppUtil.showFragment(new AboutFragment(), getSupportFragmentManager(), true);
   }
 
-  @Override
+  /*@Override
   public void onBackPressed() {
     if (binding.toolbarLayout.searchView.isSearchOpen()) {
       binding.toolbarLayout.searchView.closeSearch();
     } else {
       super.onBackPressed();
     }
-  }
+  }*/
 }

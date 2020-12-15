@@ -24,9 +24,23 @@
         </LinearLayout>
     </androidx.appcompat.widget.Toolbar>
 
-    <com.miguelcatalan.materialsearchview.MaterialSearchView
-        android:id="@+id/search_view"
-        style="@style/MaterialSearchViewStyle"
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+    <TextView
+        android:id="@+id/etCity"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:textAppearance="@style/Base.TextAppearance.AppCompat.Large" />
+
+    <ImageButton
+        android:id="@+id/btnVoice"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginBottom="20dp"
+        android:background="@drawable/voice" />
+    </LinearLayout>
 </FrameLayout>

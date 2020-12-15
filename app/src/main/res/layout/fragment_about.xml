@@ -19,7 +19,8 @@
         app:backgroundTint="?attr/colorPrimary"
         app:fabSize="mini"
         app:srcCompat="@drawable/ic_close_black_24dp"
-        app:tint="?attr/colorControlNormal" />
+        app:tint="?attr/colorControlNormal"
+        tools:ignore="MissingClass" />
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/card_view"
